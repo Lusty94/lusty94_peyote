@@ -8,7 +8,7 @@ name "lusty94_peyote"
 
 description 'Peyote Plants Script For QB Core'
 
-version '1.0.0'
+version '1.1.0'
 
 lua54 'yes'
 

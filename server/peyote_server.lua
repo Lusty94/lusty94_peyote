@@ -4,6 +4,28 @@ local NotifyType = Config.CoreSettings.Notify.Type
 local InvType = Config.CoreSettings.Inventory.Type
 local Levels = Config.XP.Levels
 
+
+--notification function
+local function SendNotify(src, msg, type, time, title)
+    if not title then title = "Peyote" end
+    if not time then time = 5000 end
+    if not type then type = 'success' end
+    if not msg then print("Notification Sent With No Message") return end
+    if NotifyType == 'qb' then
+        TriggerClientEvent('QBCore:Notify', src, msg, type, time)
+    elseif NotifyType == 'okok' then
+        TriggerClientEvent('okokNotify:Alert', src, title, msg, time, type, Config.CoreSettings.Notify.Sound)
+    elseif NotifyType == 'mythic' then
+        TriggerClientEvent('mythic_notify:client:SendAlert', src, { type = type, text = msg, style = { ['background-color'] = '#00FF00', ['color'] = '#FFFFFF' } })
+    elseif NotifyType == 'boii'  then
+        TriggerClientEvent('boii_ui:notify', src, title, msg, type, time)
+    elseif NotifyType == 'ox' then 
+        TriggerClientEvent('ox_lib:notify', src, ({ title = title, description = msg, length = time, type = type, style = 'default'}))
+    end
+end
+
+
+
 ----------USEABLE ITEMS-------------
 
 --peyote plants
@@ -18,8 +40,8 @@ end)
 QBCore.Functions.CreateCallback('lusty94_peyote:get:PeyotePlants', function(source, cb)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local item1 = Player.Functions.GetItemByName("peyoteplants")
-    if item1 then
+    local peyote = Player.Functions.GetItemByName("peyoteplants")
+    if peyote then
         cb(true)
     else
         cb(false)
@@ -29,8 +51,8 @@ end)
 QBCore.Functions.CreateCallback('lusty94_peyote:get:Shovel', function(source, cb)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local item1 = Player.Functions.GetItemByName("shovel")
-    if item1 then
+    local shovel = Player.Functions.GetItemByName("shovel")
+    if shovel then
         cb(true)
     else
         cb(false)
@@ -67,39 +89,19 @@ RegisterServerEvent('lusty94_peyote:server:PickPeyotePlants', function()
     else amount = math.random(3,6) end
         if InvType == 'qb' then
             Player.Functions.AddItem("peyoteplants", amount)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["peyoteplants"], "add")
+            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["peyoteplants"], "add", amount)
         elseif InvType == 'ox' then
             if exports.ox_inventory:CanCarryItem(src, 'peyoteplants', amount) then
                 exports.ox_inventory:AddItem(src, "peyoteplants", amount)
             else
-                if NotifyType == 'qb' then
-                    TriggerClientEvent('QBCore:Notify', src, Config.Language.Notifications.CantCarryName, 'error', Config.CoreSettings.Notify.Length.Error)
-                elseif NotifyType == 'okok' then
-                    TriggerClientEvent('okokNotify:Alert', src, Config.Language.Notifications.CantCarryLabel, Config.Language.Notifications.CantCarryName, Config.CoreSettings.Notify.Length.Error, 'error', Config.CoreSettings.Notify.Sound)
-                elseif NotifyType == 'mythic' then
-                    TriggerClientEvent('mythic_notify:client:SendAlert', src, { type = 'error', text = Config.Language.Notifications.CantCarryName, style = { ['background-color'] = '#FF0000', ['color'] = '#FFFFFF' } })
-                elseif NotifyType == 'boii'  then
-                    TriggerClientEvent('boii_ui:notify', src, Config.Language.Notifications.CantCarryLabel, Config.Language.Notifications.CantCarryName, 'error', Config.CoreSettings.Notify.Length.Error)
-                elseif NotifyType == 'ox' then 
-                    TriggerClientEvent('ox_lib:notify', src, ({ title = Config.Language.Notifications.CantCarryLabel, description = Config.Language.Notifications.CantCarryName, length = Config.CoreSettings.Notify.Length.Error, type = 'error', style = 'default'}))
-                end
+                SendNotify(src,"You Can\'t Carry Anymore of This Item!", 'error', 2000)
             end
         end
 
 
     if Config.XP.Enabled then
         Player.Functions.SetMetaData(MetaDataName, (PeyoteXP + math.random(5,10))) -- Edit xp reward here
-        if NotifyType == 'qb' then
-            TriggerClientEvent('QBCore:Notify', src, Config.Language.Notifications.EarnedXpName, 'success', Config.CoreSettings.Notify.Length.Success)
-        elseif NotifyType == 'okok' then
-            TriggerClientEvent('okokNotify:Alert', src, Config.Language.Notifications.EarnedXpLabel, Config.Language.Notifications.EarnedXpName, Config.CoreSettings.Notify.Length.Success, 'success', Config.CoreSettings.Notify.Sound)
-        elseif NotifyType == 'mythic' then
-            TriggerClientEvent('mythic_notify:client:SendAlert', src, { type = 'success', text = Config.Language.Notifications.EarnedXpName, style = { ['background-color'] = '#FF0000', ['color'] = '#FFFFFF' } })
-        elseif NotifyType == 'boii'  then
-            TriggerClientEvent('boii_ui:notify', src, Config.Language.Notifications.EarnedXpLabel, Config.Language.Notifications.EarnedXpName, 'success', Config.CoreSettings.Notify.Length.Success)
-        elseif NotifyType == 'ox' then 
-            TriggerClientEvent('ox_lib:notify', src, ({ title = Config.Language.Notifications.EarnedXpLabel, description = Config.Language.Notifications.EarnedXpName, length = Config.CoreSettings.Notify.Length.Success, type = 'success', style = 'default'}))
-        end
+        SendNotify(src,"You Earned Some XP!", 'success', 2000)
     end	
 end)
 
@@ -111,7 +113,7 @@ RegisterServerEvent('lusty94_peyote:server:TakePeyotePlants', function()
     
     if InvType == 'qb' then
 	    Player.Functions.RemoveItem('peyoteplants', 1)
-	    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['peyoteplants'], "remove")
+	    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['peyoteplants'], "remove", 1)
     elseif InvType == 'ox' then
         exports.ox_inventory:RemoveItem(src, 'peyoteplants', 1)        
     end
@@ -134,30 +136,13 @@ if Config.XP.Enabled then
                         level = i + 1
                     end
                 end
-                if NotifyType == 'qb' then
-                    TriggerClientEvent('QBCore:Notify', src, 'You Are Currently Level: ' ..level.. ' ( You have: ' ..data.. ' xp)', 'success', Config.CoreSettings.Notify.Length.Success)
-                elseif NotifyType == 'okok' then
-                    TriggerClientEvent('okokNotify:Alert', src, 'XP Level', 'You Are Currently Level: ' ..level.. ' ( You have: ' ..data.. ' xp)', Config.CoreSettings.Notify.Length.Success, 'success', Config.CoreSettings.Notify.Sound)
-                elseif NotifyType == 'mythic' then
-                    TriggerClientEvent('mythic_notify:client:SendAlert', src, { type = 'success', text = 'You Are Currently Level: ' ..level.. ' ( You have: ' ..data.. ' xp)', style = { ['background-color'] = '#FF0000', ['color'] = '#FFFFFF' } })
-                elseif NotifyType == 'boii'  then
-                    TriggerClientEvent('boii_ui:notify', src, 'XP Level', 'You Are Currently Level: ' ..level.. ' ( You have: ' ..data.. ' xp)', 'success', Config.CoreSettings.Notify.Length.Success)
-                elseif NotifyType == 'ox' then 
-                    TriggerClientEvent('ox_lib:notify', src, ({ title = 'XP Level', description = 'You Are Currently Level: ' ..level.. ' ( You have: ' ..data.. ' xp)', length = Config.CoreSettings.Notify.Length.Success, type = 'success', style = 'default'}))
-                end
+                SendNotify(src, "You Are Currently Level: " ..level.. " ( You have: " ..data.. " xp)", 'success', 2000)
             end
         end)
     end
 end
 
 
-
-AddEventHandler('onResourceStart', function(resourceName)
-    if (GetCurrentResourceName() ~= resourceName) then
-      return
-    end
-        print('^5--<^3!^5>-- ^7| Lusty94 ^5| ^5--<^3!^5>-- ^7 Peyote V1.0.0 Started Successfully ^5--<^3!^5>--^7')
-end)
 
 
 
