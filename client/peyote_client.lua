@@ -1,10 +1,10 @@
 local QBCore = exports['qb-core']:GetCoreObject()
-local peyotePlants = {}
-local busy = false
 local NotifyType = Config.CoreSettings.Notify.Type
 local TargetType = Config.CoreSettings.Target.Type
 local ClothingType = Config.CoreSettings.Clothing.Type
 local EvidenceEvent = Config.CoreSettings.EventNames.Evidence
+local spawnedPeyote = {}
+local busy = false
 local peyoteprop = 'prop_peyote_water_01'
 
 --notification function
@@ -30,7 +30,7 @@ end
 CreateThread(function()
 	for k,v in pairs(Config.Blips) do
 		if v.useblip then
-            peyoteblip = AddBlipForCoord(v['coords'].x, v['coords'].y, v['coords'].z)
+            peyoteblip = AddBlipForCoord(v.coords.x, v.coords.y, v.coords.z)
             SetBlipSprite(peyoteblip, v.id)
             SetBlipDisplay(peyoteblip, 4)
             SetBlipScale(peyoteblip, v.scale)
@@ -47,21 +47,18 @@ end)
 --thread for spawning peyote plants
 CreateThread(function()
 	for k, v in pairs(Config.InteractionLocations.PeyotePlants) do
-		RequestModel(peyoteprop)
-		while not HasModelLoaded(peyoteprop) do
-			Wait(1000)
-		end
-		local plant = CreateObject(peyoteprop, v.coords.x, v.coords.y, v.coords.z-1, false, true, false)
-		PlaceObjectOnGroundProperly(plant)
-		FreezeEntityPosition(plant, true)
-		peyotePlants[#peyotePlants+1] = plant
-		SetEntityDrawOutline(plant, true)
+		lib.requestModel(peyoteprop, 5000)
+		peyotePlants = CreateObject(peyoteprop, v.coords.x, v.coords.y, v.coords.z-1, false, true, false)
+		PlaceObjectOnGroundProperly(peyotePlants)
+		FreezeEntityPosition(peyotePlants, true)
+		spawnedPeyote[#spawnedPeyote+1] = peyotePlants
+		SetEntityDrawOutline(peyotePlants, true)
 		SetEntityDrawOutlineColor(75, 153, 0, 1.0)
 		SetEntityDrawOutlineShader(0)
 		if TargetType == 'qb' then
-			exports['qb-target']:AddTargetEntity(plant, { options = { { item = v.item,type = "client", event = "lusty94_peyote:client:PickPeyotePlants", icon = v.icon, label = v.label, }, }, distance = v.distance })
+			exports['qb-target']:AddTargetEntity(peyotePlants, { options = { { item = v.item,type = "client", event = "lusty94_peyote:client:PickPeyotePlants", icon = v.icon, label = v.label, }, }, distance = v.distance })
 		elseif TargetType == 'ox' then
-			exports.ox_target:addLocalEntity(plant, ({ name = 'plant', items = v.item, name = 'peyoteplants', label = v.label, icon = v.icon, event = 'lusty94_peyote:client:PickPeyotePlants', distance = v.distance, }))
+			exports.ox_target:addLocalEntity(peyotePlants, ({ name = 'peyotePlants', items = v.item, label = v.label, icon = v.icon, event = 'lusty94_peyote:client:PickPeyotePlants', distance = v.distance, }))
 		end
 	end
 end)
@@ -75,9 +72,9 @@ RegisterNetEvent("lusty94_peyote:client:PickPeyotePlants", function()
 	local coords = GetEntityCoords(playerPed)
 	local nearbyObject, nearbyID
 
-	for i=1, #peyotePlants, 1 do
-		if #(coords - GetEntityCoords(peyotePlants[i])) < 3 then
-			nearbyObject, nearbyID = peyotePlants[i], i
+	for i=1, #spawnedPeyote, 1 do
+		if #(coords - GetEntityCoords(spawnedPeyote[i])) < 3 then
+			nearbyObject, nearbyID = spawnedPeyote[i], i
 		end
 	end
 
@@ -85,36 +82,36 @@ RegisterNetEvent("lusty94_peyote:client:PickPeyotePlants", function()
 		if busy then
 			SendNotify("You are already doing something!", 'error', 2500)
 		else
-			busy = true			
-			QBCore.Functions.TriggerCallback('lusty94_peyote:get:Shovel', function(HasItems)  
-				local prop = GetHashKey(Config.Animations.PickPeyotePlants.Prop)
-				local coords = GetEntityCoords(PlayerPedId())
-				RequestModel(prop)
-				while not HasModelLoaded(prop) do
-					Wait(1000)
-				end
-				local shovel = CreateObject(prop, GetEntityCoords(PlayerPedId()), true, true, true)
-				AttachEntityToEntity(shovel, PlayerPedId(), GetPedBoneIndex(PlayerPedId(), 28422), 0.0, 0.0, 0.24, 0, 0, 0.0, 0.0, true, true, false, false, 1, true)
+			QBCore.Functions.TriggerCallback('lusty94_peyote:get:Shovel', function(HasItems)
 				if HasItems then
-					if lib.progressCircle({ duration = 5000, position = 'bottom', useWhileDead = false, canCancel = true, disable = { car = false, }, anim = { dict = Config.Animations.PickPeyotePlants.AnimDict, clip = Config.Animations.PickPeyotePlants.Anim }, }) 
-					then
-						DeleteEntity(shovel)
-							ClearPedTasks(PlayerPedId())
-							SetEntityAsMissionEntity(nearbyObject, false, true)
-							DeleteObject(nearbyObject)
-							peyotePlants[nearbyID] = nil
-							local chance = math.random(1,100)
-							if chance <= 75 then
-								TriggerServerEvent('lusty94_peyote:server:PickPeyotePlants')
-							else
-								SendNotify("This plant was damaged! Try another", 'error', 2500)
-							end
-							busy = false
+					busy = true
+					LockInventory(true)			
+					if lib.progressCircle({ 
+						duration = 5000, 
+						position = 'bottom', 
+						label = 'Picking peyote plants',
+						useWhileDead = false, 
+						canCancel = true, 
+						disable = { car = true, move = true, }, 
+						anim = { dict = Config.Animations.PickPeyotePlants.AnimDict, clip = Config.Animations.PickPeyotePlants.Anim, flag = Config.Animations.PickPeyotePlants.Flags },
+						prop = { model = Config.Animations.PickPeyotePlants.Prop, bone = Config.Animations.PickPeyotePlants.Bone, pos = Config.Animations.PickPeyotePlants.Pos, rot = Config.Animations.PickPeyotePlants.Rot,},
+					}) then
+						SetEntityAsMissionEntity(nearbyObject, false, true)
+						DeleteObject(nearbyObject)
+						spawnedPeyote[nearbyID] = nil
+						local pick = 75 -- change chance to get peyote here
+						local chance = math.random(1,100)
+						if pick >= chance then
+							TriggerServerEvent('lusty94_peyote:server:PickPeyotePlants')
+						else
+							SendNotify("This plant was damaged! Try another", 'error', 2500)
+						end
+						busy = false
+						LockInventory(false)
 					else
-						DeleteEntity(shovel)
-							ClearPedTasks(PlayerPedId())
-							busy = false
-							SendNotify("Action cancelled!", 'error', 2500)
+						busy = false
+						LockInventory(false)
+						SendNotify("Action cancelled!", 'error', 2500)
 					end
 				else
 					SendNotify("You are missing items required to pick peyote plants!", 'error', 2500)
@@ -151,102 +148,133 @@ local modelVariants = {
 
 
 
-
-local function TakePeyotePlants()
+--consume peyote plants function
+function TakePeyotePlants()
 	local randomModel = modelVariants[math.random(1, #modelVariants)]
-	local player = PlayerPedId()
-	print('random model selected to transform into is:', randomModel, 'if this model is invisible then delete it from modelVariants above')
-	Wait(2500)
+	local playerPed = PlayerPedId()
+	print('random model selected to transform into is:', randomModel, 'if the selected model is invisible then delete it from modelVariants table - some models are not compatible as player models')
+	Wait(2000)
 	SetFlash(0, 0, 500, 7000, 500)
 	ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.00)
 	Wait(2000)
 	ShakeGameplayCam('DRUNK_SHAKE', 1.10)
-	Wait(3000) 
+	Wait(2000) 
 	SetTimecycleModifier('spectator5')
-	SetPedMotionBlur(player, true) 
+	SetPedMotionBlur(playerPed, true) 
 	TriggerEvent(EvidenceEvent, "widepupils", 300)
 	SetFlash(0, 0, 500, 7000, 500)
 	ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.10)
 	Wait(2000)
 	SetFlash(0, 0, 500, 7000, 500)
 	ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.10)
-	Wait(2500)
+	Wait(2000)
 	DoScreenFadeOut(1000)
-	Wait(2500)
+	Wait(2000)
 	ClearTimecycleModifier()
     ResetScenarioTypesEnabled()
-    SetRunSprintMultiplierForPlayer(player, 1.0)
-    StopGameplayCamShaking(player, true)
-    SetPedIsDrunk(player, false)
-    SetPedMotionBlur(player, false)
+    StopGameplayCamShaking(playerPed, true)
+    SetPedIsDrunk(playerPed, false)
+    SetPedMotionBlur(playerPed, false)
 	if IsModelInCdimage(randomModel) and IsModelValid(randomModel) then
 		RequestModel(randomModel)
 		while not HasModelLoaded(randomModel) do
-			Wait(0)
+			Wait(1000)
 		end
-		SetPlayerModel(PlayerId(), randomModel)
-		SetPlayerInvincible(PlayerPedId(), true)
+		SetPlayerModel(PlayerPedId(), randomModel)
+		SetPlayerInvincible(playerPed, true)
 		SetModelAsNoLongerNeeded(randomModel)
 	end
-	Wait(1000)
-	DoScreenFadeIn(2500)
-	Wait(15000)
+	Wait(1500)
+	DoScreenFadeIn(2000)
+	Wait(20000)
 	DoScreenFadeOut(1000)
-	Wait(2500)
+	Wait(2000)
 	if ClothingType == 'qb' then
 		TriggerServerEvent('qb-clothes:loadPlayerSkin')
 	elseif ClothingType == 'illenium' then
 		TriggerServerEvent('qb-clothes:loadPlayerSkin') -- support for illenium-appearance as illenium has qb compatibility providing you installed it correctly!
 	end
-	SetPlayerInvincible(PlayerPedId(), false)
-	SetEntityHealth(PlayerPedId(), GetEntityHealth(PlayerPedId()) + 100)
-	DoScreenFadeIn(2500)
-	ClearPedTasks(player)
+	SetPlayerInvincible(playerPed, false)
+	SetEntityHealth(playerPed, GetEntityHealth(playerPed) + 100)
+	Wait(2000)
+	DoScreenFadeIn(2000)
+	ClearPedTasks(playerPed)
 end
 
 
 -- take peyote plants
 RegisterNetEvent('lusty94_peyote:client:TakePeyotePlants', function()
-
-	QBCore.Functions.TriggerCallback('lusty94_peyote:get:PeyotePlants', function(HasItems)  
-        if HasItems then
-			if busy then
-				SendNotify("You are already doing something!", 'error', 2500)
-			else
+	local playerPed = PlayerPedId()
+	if busy then
+		SendNotify("You are already doing something!", 'error', 2500)
+	else
+		QBCore.Functions.TriggerCallback('lusty94_peyote:get:PeyotePlants', function(HasItems)  
+			if HasItems then
 				busy = true
-				RequestModel(peyoteprop)
-				while not HasModelLoaded(peyoteprop) do
-					Wait(1000)
-				end
-				local prop = CreateObject(peyoteprop, GetEntityCoords(PlayerPedId()), true, true, true)
-				AttachEntityToEntity(prop, PlayerPedId(), GetPedBoneIndex(PlayerPedId(), 18905), 0.15, 0.0, 0.0, -190.0, 0.0, 0.0, true, true, false, false, 1, true)
-				if lib.progressCircle({ duration = 5000, position = 'bottom', useWhileDead = false, canCancel = true, disable = { car = false, }, anim = { dict = Config.Animations.TakeDrugs.AnimDict, clip = Config.Animations.TakeDrugs.Anim }, }) 
-				then
-					DeleteEntity(prop)
-					busy = false
+				LockInventory(true)
+				if lib.progressCircle({ 
+					duration = 5000, 
+					label = 'Consuming peyote plant',
+					position = 'bottom', 
+					useWhileDead = false, 
+					canCancel = true, 
+					disable = { car = false, move = false, }, 
+					anim = { dict = Config.Animations.ConsumePeyote.AnimDict, clip = Config.Animations.ConsumePeyote.Anim, flag = Config.Animations.ConsumePeyote.Flags },
+					prop = { model = Config.Animations.ConsumePeyote.Prop, bone = Config.Animations.ConsumePeyote.Bone, pos = Config.Animations.ConsumePeyote.Pos, rot = Config.Animations.ConsumePeyote.Rot,},
+				}) then
 					TriggerServerEvent('lusty94_peyote:server:TakePeyotePlants')
+					busy = false
+					LockInventory(false)
 					TakePeyotePlants()
 				else
-					DeleteEntity(prop)
-					ClearPedTasks(PlayerPedId())
 					busy = false
+					LockInventory(false)
 					SendNotify("Action cancelled!", 'error', 2500)
 				end
+			else
+				SendNotify("You are missing items required!", 'error', 2500)
 			end
-		else
-			SendNotify("You are missing items required!", 'error', 2500)
-		end
-	end)
+		end)
+	end
 end)
 
 
+-- function to lock inventory to prevent exploits
+function LockInventory(toggle) -- big up to jim for how to do this
+	if toggle then
+        LocalPlayer.state:set("inv_busy", true, true) -- used by qb, ps and ox
+        --this is the old method below
+        --[[         
+        if InvType == 'qb' then
+            this is for the old method if using old qb and ox
+            TriggerEvent('inventory:client:busy:status', true) TriggerEvent('canUseInventoryAndHotbar:toggle', false)
+        elseif InvType == 'ox' then
+            LocalPlayer.state:set("inv_busy", true, true)
+        end         
+        ]]
+    else 
+        LocalPlayer.state:set("inv_busy", false, true) -- used by qb, ps and ox
+        --this is the old method below
+        --[[        
+        if InvType == 'qb' then
+            this is for the old method if using old qb and ox
+         TriggerEvent('inventory:client:busy:status', false) TriggerEvent('canUseInventoryAndHotbar:toggle', true)
+        elseif InvType == 'ox' then
+            LocalPlayer.state:set("inv_busy", false, true)
+        end        
+        ]]
+    end
+end
 
 
 
 AddEventHandler('onResourceStop', function(resource)
 	if resource == GetCurrentResourceName() then
-		for _, v in pairs(peyotePlants) do SetEntityAsMissionEntity(v, false, true) DeleteObject(v) end
+		for _, v in pairs(spawnedPeyote) do SetEntityAsMissionEntity(v, false, true) DeleteObject(v) end
+		spawnedPeyote = {}
+		if TargetType == 'qb' then exports['qb-target']:RemoveTargetEntity(peyotePlants, 'peyotePlants') elseif TargetType == 'ox' then exports.ox_target:removeLocalEntity(peyotePlants, 'peyotePlants') end
 		busy = false
-		print('^5--<^3!^5>-- ^7| Lusty94 |^5 ^5--<^3!^5>--^7 Peyote V1.0.0 Stopped Successfully ^5--<^3!^5>--^7')
+		LockInventory(false)
+		print('^5--<^3!^5>-- ^7| Lusty94 |^5 ^5--<^3!^5>--^7 Peyote V2.0.0 Stopped Successfully ^5--<^3!^5>--^7')
 	end
 end)

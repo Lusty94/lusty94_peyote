@@ -41,7 +41,7 @@ QBCore.Functions.CreateCallback('lusty94_peyote:get:PeyotePlants', function(sour
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     local peyote = Player.Functions.GetItemByName("peyoteplants")
-    if peyote then
+    if peyote and peyote.amount >= 1 then
         cb(true)
     else
         cb(false)
@@ -52,7 +52,7 @@ QBCore.Functions.CreateCallback('lusty94_peyote:get:Shovel', function(source, cb
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     local shovel = Player.Functions.GetItemByName("shovel")
-    if shovel then
+    if shovel and shovel.amount >= 1 then
         cb(true)
     else
         cb(false)
@@ -69,36 +69,36 @@ RegisterServerEvent('lusty94_peyote:server:PickPeyotePlants', function()
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
     local PeyoteXP = Player.PlayerData.metadata[MetaDataName]
-
+    if not Player then return end
+    local returnAmount
     if Config.XP.Enabled then
-        if PeyoteXP <= 150 then
-            amount = math.random(2,5)
-        elseif PeyoteXP <= 500 then
-            amount = math.random(5,8)
-        elseif PeyoteXP <= 750 then
-            amount = math.random(8, 11)
-        elseif PeyoteXP <= 1250 then
-            amount = math.random(11, 14)
-        elseif PeyoteXP <= 1500 then
-            amount = math.random(14, 17)
-        elseif PeyoteXP <= 2000 then
-            amount = math.random(17, 20)
+        if PeyoteXP >= 150 then
+            returnAmount = math.random(2,5)
+        elseif PeyoteXP >= 500 then
+            returnAmount = math.random(5,9)
+        elseif PeyoteXP >= 750 then
+            returnAmount = math.random(9, 13)
+        elseif PeyoteXP >= 1250 then
+            returnAmount = math.random(13, 18)
+        elseif PeyoteXP >= 1500 then
+            returnAmount = math.random(18, 25)
+        elseif PeyoteXP >= 2200 then
+            returnAmount = math.random(25, 32)
+        end
+    else
+        returnAmount = 2 -- edit return amount here if not using xp
+    end
+    if InvType == 'qb' then
+        if exports['qb-inventory']:AddItem(src, 'peyoteplants', returnAmount, nil, nil, nil) then
+            TriggerClientEvent("qb-inventory:client:ItemBox", src, QBCore.Shared.Items["peyoteplants"], "add", returnAmount)
+        end
+    elseif InvType == 'ox' then
+        if exports.ox_inventory:CanCarryItem(src, 'peyoteplants', returnAmount) then
+            exports.ox_inventory:AddItem(src, "peyoteplants", returnAmount)
         else
-            amount = math.random(23,26)
+            SendNotify(src,"You Can\'t Carry Anymore of This Item!", 'error', 2000)
         end
-    else amount = math.random(3,6) end
-        if InvType == 'qb' then
-            Player.Functions.AddItem("peyoteplants", amount)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["peyoteplants"], "add", amount)
-        elseif InvType == 'ox' then
-            if exports.ox_inventory:CanCarryItem(src, 'peyoteplants', amount) then
-                exports.ox_inventory:AddItem(src, "peyoteplants", amount)
-            else
-                SendNotify(src,"You Can\'t Carry Anymore of This Item!", 'error', 2000)
-            end
-        end
-
-
+    end
     if Config.XP.Enabled then
         Player.Functions.SetMetaData(MetaDataName, (PeyoteXP + math.random(5,10))) -- Edit xp reward here
         SendNotify(src,"You Earned Some XP!", 'success', 2000)
@@ -110,10 +110,11 @@ end)
 RegisterServerEvent('lusty94_peyote:server:TakePeyotePlants', function()
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
-    
+    if not Player then return end
     if InvType == 'qb' then
-	    Player.Functions.RemoveItem('peyoteplants', 1)
-	    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['peyoteplants'], "remove", 1)
+	    if exports['qb-inventory']:RemoveItem(src, 'peyoteplants', 1, nil, nil, nil) then
+            TriggerClientEvent("qb-inventory:client:ItemBox", src, QBCore.Shared.Items["peyoteplants"], "remove", 1)
+        end
     elseif InvType == 'ox' then
         exports.ox_inventory:RemoveItem(src, 'peyoteplants', 1)        
     end
