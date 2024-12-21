@@ -20,8 +20,6 @@ local function SendNotify(msg,type,time,title)
         exports['okokNotify']:Alert(title, msg, time, type, true)
     elseif NotifyType == 'mythic' then
         exports['mythic_notify']:DoHudText(type, msg)
-    elseif NotifyType == 'boii' then
-        exports['boii_ui']:notify(title, msg, type, time)
     elseif NotifyType == 'ox' then
         lib.notify({ title = title, description = msg, type = type, duration = time})
     end
@@ -47,18 +45,48 @@ end)
 --thread for spawning peyote plants
 CreateThread(function()
 	for k, v in pairs(Config.InteractionLocations.PeyotePlants) do
-		lib.requestModel(peyoteprop, 5000)
-		peyotePlants = CreateObject(peyoteprop, v.coords.x, v.coords.y, v.coords.z-1, false, true, false)
+		lib.requestModel(peyoteprop, 10000)
+		peyotePlants = CreateObject(peyoteprop, v.coords.x, v.coords.y, v.coords.z-1, true, false, false)
 		PlaceObjectOnGroundProperly(peyotePlants)
 		FreezeEntityPosition(peyotePlants, true)
+		SetModelAsNoLongerNeeded(peyoteprop)
 		spawnedPeyote[#spawnedPeyote+1] = peyotePlants
 		SetEntityDrawOutline(peyotePlants, true)
 		SetEntityDrawOutlineColor(75, 153, 0, 1.0)
 		SetEntityDrawOutlineShader(0)
 		if TargetType == 'qb' then
-			exports['qb-target']:AddTargetEntity(peyotePlants, { options = { { item = v.item,type = "client", event = "lusty94_peyote:client:PickPeyotePlants", icon = v.icon, label = v.label, }, }, distance = v.distance })
+			exports['qb-target']:AddTargetEntity(peyotePlants, { options = { 
+				{ 
+					item = v.item,
+					type = "client", 
+					action = function()
+						if not busy then
+							pickPeyotePlants()
+						else
+							SendNotify(Config.Language.Notifications.Busy, 'error', 5000)
+						end
+					end,
+					icon = v.icon, 
+					label = v.label, 
+				}, 
+			}, distance = v.distance })
 		elseif TargetType == 'ox' then
-			exports.ox_target:addLocalEntity(peyotePlants, ({ name = 'peyotePlants', items = v.item, label = v.label, icon = v.icon, event = 'lusty94_peyote:client:PickPeyotePlants', distance = v.distance, }))
+			exports.ox_target:addLocalEntity(peyotePlants, (
+				{ 
+					name = 'peyotePlants', 
+					items = v.item, 
+					label = v.label, 
+					icon = v.icon, 
+					onSelect = function()
+						if not busy then
+							pickPeyotePlants()
+						else
+							SendNotify(Config.Language.Notifications.Busy, 'error', 5000)
+						end
+					end,
+					distance = v.distance, 
+				}
+			))
 		end
 	end
 end)
@@ -67,7 +95,7 @@ end)
 
 
 -- Pick Peyote Plants
-RegisterNetEvent("lusty94_peyote:client:PickPeyotePlants", function()
+function pickPeyotePlants()
 	local playerPed = PlayerPedId()
 	local coords = GetEntityCoords(playerPed)
 	local nearbyObject, nearbyID
@@ -80,7 +108,7 @@ RegisterNetEvent("lusty94_peyote:client:PickPeyotePlants", function()
 
 	if nearbyObject and IsPedOnFoot(playerPed) then
 		if busy then
-			SendNotify("You are already doing something!", 'error', 2500)
+			SendNotify(Config.Language.Notifications.Busy, 'error', 2500)
 		else
 			QBCore.Functions.TriggerCallback('lusty94_peyote:get:Shovel', function(HasItems)
 				if HasItems then
@@ -93,8 +121,17 @@ RegisterNetEvent("lusty94_peyote:client:PickPeyotePlants", function()
 						useWhileDead = false, 
 						canCancel = true, 
 						disable = { car = true, move = true, }, 
-						anim = { dict = Config.Animations.PickPeyotePlants.AnimDict, clip = Config.Animations.PickPeyotePlants.Anim, flag = Config.Animations.PickPeyotePlants.Flags },
-						prop = { model = Config.Animations.PickPeyotePlants.Prop, bone = Config.Animations.PickPeyotePlants.Bone, pos = Config.Animations.PickPeyotePlants.Pos, rot = Config.Animations.PickPeyotePlants.Rot,},
+						anim = { 
+							dict = Config.Animations.PickPeyotePlants.AnimDict, 
+							clip = Config.Animations.PickPeyotePlants.Anim, 
+							flag = Config.Animations.PickPeyotePlants.Flags,
+						},
+						prop = { 
+							model = Config.Animations.PickPeyotePlants.Prop, 
+							bone = Config.Animations.PickPeyotePlants.Bone, 
+							pos = Config.Animations.PickPeyotePlants.Pos, 
+							rot = Config.Animations.PickPeyotePlants.Rot,
+						},
 					}) then
 						SetEntityAsMissionEntity(nearbyObject, false, true)
 						DeleteObject(nearbyObject)
@@ -104,22 +141,22 @@ RegisterNetEvent("lusty94_peyote:client:PickPeyotePlants", function()
 						if pick >= chance then
 							TriggerServerEvent('lusty94_peyote:server:PickPeyotePlants')
 						else
-							SendNotify("This plant was damaged! Try another", 'error', 2500)
+							SendNotify(Config.Language.Notifications.NothingFound, 'error', 2500)
 						end
 						busy = false
 						LockInventory(false)
 					else
 						busy = false
 						LockInventory(false)
-						SendNotify("Action cancelled!", 'error', 2500)
+						SendNotify(Config.Language.Notifications.Cancelled, 'error', 2500)
 					end
 				else
-					SendNotify("You are missing items required to pick peyote plants!", 'error', 2500)
+					SendNotify(Config.Language.Notifications.MissingItem, 'error', 2500)
 				end
 			end)
 		end
 	end
-end)
+end
 
 
 
@@ -176,10 +213,7 @@ function TakePeyotePlants()
     SetPedIsDrunk(playerPed, false)
     SetPedMotionBlur(playerPed, false)
 	if IsModelInCdimage(randomModel) and IsModelValid(randomModel) then
-		RequestModel(randomModel)
-		while not HasModelLoaded(randomModel) do
-			Wait(1000)
-		end
+		lib.requestModel(randomModel, 10000)
 		SetPlayerModel(PlayerPedId(), randomModel)
 		SetPlayerInvincible(playerPed, true)
 		SetModelAsNoLongerNeeded(randomModel)
@@ -206,7 +240,7 @@ end
 RegisterNetEvent('lusty94_peyote:client:TakePeyotePlants', function()
 	local playerPed = PlayerPedId()
 	if busy then
-		SendNotify("You are already doing something!", 'error', 2500)
+		SendNotify(Config.Language.Notifications.Busy, 'error', 2500)
 	else
 		QBCore.Functions.TriggerCallback('lusty94_peyote:get:PeyotePlants', function(HasItems)  
 			if HasItems then
@@ -219,8 +253,17 @@ RegisterNetEvent('lusty94_peyote:client:TakePeyotePlants', function()
 					useWhileDead = false, 
 					canCancel = true, 
 					disable = { car = false, move = false, }, 
-					anim = { dict = Config.Animations.ConsumePeyote.AnimDict, clip = Config.Animations.ConsumePeyote.Anim, flag = Config.Animations.ConsumePeyote.Flags },
-					prop = { model = Config.Animations.ConsumePeyote.Prop, bone = Config.Animations.ConsumePeyote.Bone, pos = Config.Animations.ConsumePeyote.Pos, rot = Config.Animations.ConsumePeyote.Rot,},
+					anim = { 
+						dict = Config.Animations.ConsumePeyote.AnimDict, 
+						clip = Config.Animations.ConsumePeyote.Anim, 
+						flag = Config.Animations.ConsumePeyote.Flags,
+					},
+					prop = { 
+						model = Config.Animations.ConsumePeyote.Prop, 
+						bone = Config.Animations.ConsumePeyote.Bone, 
+						pos = Config.Animations.ConsumePeyote.Pos, 
+						rot = Config.Animations.ConsumePeyote.Rot,
+					},
 				}) then
 					TriggerServerEvent('lusty94_peyote:server:TakePeyotePlants')
 					busy = false
@@ -229,7 +272,7 @@ RegisterNetEvent('lusty94_peyote:client:TakePeyotePlants', function()
 				else
 					busy = false
 					LockInventory(false)
-					SendNotify("Action cancelled!", 'error', 2500)
+					SendNotify(Config.Language.Notifications.Cancelled, 'error', 2500)
 				end
 			else
 				SendNotify("You are missing items required!", 'error', 2500)
@@ -240,41 +283,23 @@ end)
 
 
 -- function to lock inventory to prevent exploits
-function LockInventory(toggle) -- big up to jim for how to do this
+function LockInventory(toggle)
 	if toggle then
-        LocalPlayer.state:set("inv_busy", true, true) -- used by qb, ps and ox
-        --this is the old method below
-        --[[         
-        if InvType == 'qb' then
-            this is for the old method if using old qb and ox
-            TriggerEvent('inventory:client:busy:status', true) TriggerEvent('canUseInventoryAndHotbar:toggle', false)
-        elseif InvType == 'ox' then
-            LocalPlayer.state:set("inv_busy", true, true)
-        end         
-        ]]
+        LocalPlayer.state:set("inv_busy", true, true)
     else 
-        LocalPlayer.state:set("inv_busy", false, true) -- used by qb, ps and ox
-        --this is the old method below
-        --[[        
-        if InvType == 'qb' then
-            this is for the old method if using old qb and ox
-         TriggerEvent('inventory:client:busy:status', false) TriggerEvent('canUseInventoryAndHotbar:toggle', true)
-        elseif InvType == 'ox' then
-            LocalPlayer.state:set("inv_busy", false, true)
-        end        
-        ]]
+        LocalPlayer.state:set("inv_busy", false, true)
     end
 end
 
 
 
-AddEventHandler('onResourceStop', function(resource)
-	if resource == GetCurrentResourceName() then
+AddEventHandler('onResourceStop', function(resourceName)
+	if GetCurrentResourceName() == resourceName then
 		for _, v in pairs(spawnedPeyote) do SetEntityAsMissionEntity(v, false, true) DeleteObject(v) end
 		spawnedPeyote = {}
 		if TargetType == 'qb' then exports['qb-target']:RemoveTargetEntity(peyotePlants, 'peyotePlants') elseif TargetType == 'ox' then exports.ox_target:removeLocalEntity(peyotePlants, 'peyotePlants') end
 		busy = false
 		LockInventory(false)
-		print('^5--<^3!^5>-- ^7| Lusty94 |^5 ^5--<^3!^5>--^7 Peyote V2.0.0 Stopped Successfully ^5--<^3!^5>--^7')
+		print('^5--<^3!^5>-- ^7| Lusty94 |^5 ^5--<^3!^5>--^7 Peyote V2.1.0 Stopped Successfully ^5--<^3!^5>--^7')
 	end
 end)

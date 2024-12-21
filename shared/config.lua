@@ -20,11 +20,10 @@ Config.CoreSettings = {
         Evidence = 'evidence:client:SetStatus', -- name of evidence event to set widepupils status when taking peyote plants
     },
     Notify = {
-        Type = 'qb', -- notification type, support for qb-core notify, okokNotify, mythic_notify, boii_ui notify and ox_lib notify
+        Type = 'qb', -- notification type, support for qb-core notify, okokNotify, mythic_notify and ox_lib notify
         --use 'qb' for default qb-core notify
         --use 'okok' for okokNotify
         --use 'mythic' for myhthic_notify
-        --use 'boii' for boii_ui notify
         --use 'ox' for -x_lib notify
     },     
     Target = {
@@ -47,12 +46,12 @@ Config.CoreSettings = {
 
 Config.Blips = {
     {
+        useblip = true,
         title = 'Peyote Plants', 
         colour = 5, 
         id = 66, 
         coords = vector3(1670.74, 4498.81, 33.18), 
         scale = 0.8, 
-        useblip = true,
     },
 }
 
@@ -126,5 +125,16 @@ Config.Animations = { -- change animations below for various tasks
         Bone = 18905,
         Pos = vec3(0.15, 0.0, 0.0),
         Rot = vec3(-190.0, 0.0, 0.0),
+    },
+}
+
+
+Config.Language = {
+    Notifications = {
+        Busy = 'You are already doing something!',
+        Cancelled = 'Action cancelled!',
+        Failed = 'Action failed!',
+        NothingFound = 'This plant was damaged!',
+        MissingItem = 'You are missing a shovel!',
     },
 }
